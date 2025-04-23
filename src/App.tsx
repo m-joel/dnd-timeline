@@ -108,7 +108,8 @@ function App() {
 		const updatedSpan = event.active.data.current.getSpanFromDragEvent?.(event);
 		if (!updatedSpan || !dragStartPosition.current) return;
 
-		const targetRowId = event.over?.id as string;
+		// Only allow dragging within the same row
+		const targetRowId = activeItem.rowId;
 
 		// Initialize preview positions map
 		const previewPositions = new Map();
@@ -132,9 +133,9 @@ function App() {
 			}
 		}
 
-		// Calculate preview positions for other items
+		// Calculate preview positions for other items in the same row
 		const remainingPreviewPositions = calculatePreviewPositions(
-			items.filter(item => item.id !== activeItemId),
+			items.filter(item => item.id !== activeItemId && item.rowId === targetRowId),
 			{ ...activeItem, span: updatedSpan },
 			range,
 			targetRowId,
@@ -243,21 +244,22 @@ function App() {
 	}, [items, range]);
 
 	const onDragEnd = useCallback((event: DragEndEvent) => {
-		const activeRowId = event.over?.id as string;
-		const updatedSpan = event.active.data.current.getSpanFromDragEvent?.(event);
-
-		if (!updatedSpan || !activeRowId) return;
-
 		const activeItemId = event.active.id;
 		const activeItem = items.find((item) => item.id === activeItemId);
 		if (!activeItem) return;
 
-		// Find overlapping items in the target row only
+		const updatedSpan = event.active.data.current.getSpanFromDragEvent?.(event);
+		if (!updatedSpan) return;
+
+		// Only allow dragging within the same row
+		const targetRowId = activeItem.rowId;
+
+		// Find overlapping items in the same row
 		const overlappingItems = findOverlappingItems(items, {
 			...activeItem,
-			rowId: activeRowId,
+			rowId: targetRowId,
 			span: updatedSpan,
-		}, activeRowId);
+		}, targetRowId);
 
 		if (overlappingItems.length > 0) {
 			const newItems = [...items];
@@ -267,7 +269,7 @@ function App() {
 				if (processedItems.has(item.id)) return;
 				processedItems.add(item.id);
 
-				const overlappingItems = findOverlappingItems(newItems, item, activeRowId);
+				const overlappingItems = findOverlappingItems(newItems, item, targetRowId);
 				overlappingItems.forEach(overlappingItem => {
 					if (processedItems.has(overlappingItem.id)) return;
 
@@ -299,7 +301,7 @@ function App() {
 			if (draggedItemIndex !== -1) {
 				newItems[draggedItemIndex] = {
 					...activeItem,
-					rowId: activeRowId,
+					rowId: targetRowId,
 					span: updatedSpan
 				};
 				processItem(newItems[draggedItemIndex]);
@@ -312,7 +314,7 @@ function App() {
 					if (item.id !== activeItemId) return item;
 					return {
 						...item,
-						rowId: activeRowId,
+						rowId: targetRowId,
 						span: updatedSpan,
 					};
 				})
